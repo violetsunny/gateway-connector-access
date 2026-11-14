@@ -1,0 +1,14 @@
+[package]
+name = "connector-tcp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+connector-common.workspace = true
+flate2.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+toml.workspace = true

@@ -1,0 +1,201 @@
+# gateway 示例配置（票 11 交付物）。
+#
+# 运行：cargo run -p gateway -- config.example.toml（工作目录 = workspace 根，协议路径相对根）。
+#
+# 冒烟语义：本文件在【无任何外部服务】的机器上可直接运行——
+#   - kafka bootstrapServers 留空 → 上行 sink 降级为 stdout 日志（生产环境填真实 broker）；
+#   - mqtt/modbus/snmp/opcua/request/tcp-client 指向不可达地址 → 各 connector 报连接失败
+#     日志，但失败隔离，进程不退；
+#   - tcp server / udp / http 真实监听本机端口，可立即用 curl/nc 验证上行。
+#
+# 需要真实外部服务的验证步骤见 .scratch/rust-connectors/manual-verification.md。
+
+# 协议脚本白名单根目录（可选，顶层键）：设置后 gateway 装配的脚本路径 canonicalize 后
+# 必须位于该目录内，越界拒绝加载并启动报错（失败可见）；不设置则不限制（向后兼容）。
+# 注意：本示例的脚本分散在多个 crate 目录，启用时需先把脚本收敛到同一目录，如：
+# scriptDir = "crates/connector-common/protocols"
+
+[kafka]
+# 生产填真实 broker，如 "10.0.0.1:9092,10.0.0.2:9092"；留空 = 冒烟模式（stdout sink）。
+bootstrapServers = ""
+# topic 缺省值对齐 Java application.yml，可按需覆盖：
+# metricTopic = "enn_data_iot_metric"
+# eventTopic = "data_iot_event"
+# infoTopic = "data_iot_device_info"
+# commandTopic = "device_command_topic"
+# cloudTopic = "iot_gateway_trdPlatform_data"
+
+# 本地设备清单（tcp 登录校验用：sn/password 匹配才放行数据上行）。
+[[devices]]
+projectId = "p1"
+sn = "SN001"
+deviceId = "dev-001"
+password = "pw1"
+
+# ---- tcp：server 真实监听 9000；client 指向不可达地址（演示失败隔离） ----
+# 拆包器约束：parserType = "JSON_OBJECT" 时 parserParams.maxLength 必填（超限断连）；
+# parserType = "ZLIB" 时可选 parserParams.maxOutputLen（解压输出上限，缺省 1MB，超限断连）。
+[tcp]
+[[tcp.server.configuration]]
+address = "127.0.0.1"
+port = 9000
+bufferSize = 4096
+parserType = "LINE"
+heartbeatInterval = 120
+[tcp.server.configuration.parserParams]
+maxLength = 65536
+[tcp.server.configuration.protocol]
+name = "json_passthrough"
+path = "crates/connector-common/protocols/json_passthrough.lua"
+type = "script"
+[tcp.server.configuration.protocol.params]
+username = "SN001"
+password = "pw1"
+
+[[tcp.client.configuration]]
+remoteAddress = "127.0.0.1"
+remotePort = 9001
+reconnectEnabled = true
+reconnectInterval = 5
+parserType = "LINE"
+[tcp.client.configuration.parserParams]
+maxLength = 65536
+[tcp.client.configuration.protocol]
+name = "json_passthrough"
+path = "crates/connector-common/protocols/json_passthrough.lua"
+type = "script"
+[tcp.client.configuration.protocol.params]
+username = "SN001"
+password = "pw1"
+
+# ---- udp：真实监听 9100，hex_frame 示例（3 字节帧：类型码 + big-endian uint16） ----
+# 验证：printf '\x01\x00\x2a' | nc -u -w1 127.0.0.1 9100 → stdout sink 打出 value=42 的
+# DEVICE_REPORT_REQ。注意 hex_frame 不能挂 tcp 链路（tcp 要求先登录，该脚本不产生登录帧）。
+[udp]
+[[udp.configuration]]
+port = 9100
+description = "hex_frame 示例监听"
+logLevel = "warn"
+[udp.configuration.protocol]
+name = "hex_frame"
+path = "crates/connector-common/protocols/hex_frame.lua"
+type = "script"
+[udp.configuration.protocol.params]
+deviceId = "dev-001"
+sn = "SN001"
+
+# ---- mqtt：指向本机 1883（无 broker 时连接失败仅记日志，自动重连） ----
+[mqtt]
+[[mqtt.configuration]]
+clientId = "gw-example-001"
+host = "127.0.0.1"
+port = 1883
+qos = 1
+topics = ["enn/+/up", "enn/+/event"]
+reconnectEnabled = true
+reconnectDelay = 5
+messageMaxBytes = 110000
+runMode = "common"
+[mqtt.configuration.protocol]
+name = "json_passthrough"
+path = "crates/connector-common/protocols/json_passthrough.lua"
+type = "script"
+# 遗嘱（可选，对齐 Java MqttLastWill）：broker 判定网关掉线时发布。
+[mqtt.configuration.lastWill]
+topic = "enn/gw-example-001/status"
+payload = "offline"
+qos = 1
+retain = true
+
+# ---- modbus-tcp：点表 URL 指向不可达地址（拉取失败仅记日志） ----
+[modbus-tcp]
+[[modbus-tcp.configuration]]
+clientId = "plc-example"
+pointDTOSPath = "http://127.0.0.1:9090/access/cloud-gateway/example/modbus/points"
+pointMapDTOSPath = "http://127.0.0.1:9090/access/cloud-gateway/example/point/mapping"
+host = "127.0.0.1"
+port = 1502
+readDiff = 5
+maxRetries = 3
+retryDelay = 30
+connectTimeout = 2000
+[modbus-tcp.configuration.protocol]
+name = "modbus_metric"
+path = "crates/connector-modbus-tcp/protocols/modbus_metric.lua"
+type = "script"
+
+# ---- http：真实监听 8080 ----
+# 验证：curl -X POST http://127.0.0.1:8080/api/productA -H 'content-type: application/json' \
+#   -d '{"messageType":"DEVICE_REPORT_REQ","deviceId":"dev-001","sn":"SN001","metrics":[{"ts":0,"code":"t","value":1}]}'
+# std 四路由：POST /access/std/{rtg,history,event,info}（报文格式见 std_http.lua）。
+[http]
+address = "127.0.0.1"
+port = 8080
+[[http.configuration]]
+requestPath = "productA"
+[http.configuration.protocol]
+name = "json_passthrough"
+path = "crates/connector-common/protocols/json_passthrough.lua"
+type = "script"
+[http.stdProtocol]
+name = "enn-standard-http"
+path = "crates/connector-http/protocols/std_http.lua"
+type = "script"
+
+# ---- snmp：轮询本机 161（无 agent 时超时仅记日志）。community 必填（Java 版硬编码，Rust 版改配置项） ----
+[snmp]
+[[snmp.configuration]]
+address = "127.0.0.1"
+port = 161
+community = "public"
+intervalMinute = 1
+[snmp.configuration.protocol]
+name = "snmp_metric"
+path = "crates/connector-snmp/protocols/snmp_metric.lua"
+type = "script"
+[snmp.configuration.protocol.params]
+OIDS = "1.3.6.1.2.1.1.1.0,1.3.6.1.2.1.1.3.0"
+deviceId = "dev-001"
+sn = "SN001"
+
+# ---- request：云 API 定时拉取，URL 不可达（失败仅记日志）；cron 为 Quartz 6 段格式 ----
+[request]
+[[request.configuration]]
+appid = "cloud-example"
+server = "pull-meter"
+productId = "prod-1"
+description = "示例：电表数据拉取"
+cron = "0/30 * * * * *"
+url = "http://127.0.0.1:9091/v1/data"
+method = "POST"
+timeoutMs = 5000
+headers = { "X-App" = "gw" }
+body = { "pageSize" = 100 }
+[request.configuration.protocol]
+name = "cloud_pull"
+path = "crates/connector-request/protocols/cloud_pull.lua"
+type = "script"
+[request.configuration.protocol.params]
+deviceId = "dev-001"
+sn = "SN001"
+
+# ---- opcua：指向本机 4840（无 server 时连接失败仅记日志） ----
+# 加密端点（可选，缺省 None/None 明文）：securityPolicy ≠ None 时 certPath/keyPath 必填
+# 且文件须存在，否则启动报错（不降级明文）：
+# securityPolicy = "Basic256Sha256"   # 仅支持 None | Basic256Sha256
+# securityMode   = "SignAndEncrypt"   # None | Sign | SignAndEncrypt
+# certPath       = "certs/opcua-client.der"
+# keyPath        = "certs/opcua-client.key"
+[opcua]
+[[opcua.configuration]]
+endpointUrl = "opc.tcp://127.0.0.1:4840"
+description = "示例 PLC"
+intervalMinute = 1
+[opcua.configuration.protocol]
+name = "opcua_metric"
+path = "crates/connector-opcua/protocols/opcua_metric.lua"
+type = "script"
+[opcua.configuration.protocol.params]
+NODES = "ns=2;s=Channel1.Device1.Temp,ns=2;s=Channel1.Device1.Pressure"
+deviceId = "dev-001"
+sn = "SN001"

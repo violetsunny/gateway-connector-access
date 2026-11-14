@@ -1,0 +1,30 @@
+# gateway 示例配置（ticket 01）。
+# 运行：cargo run -p gateway -- config.toml
+# 协议脚本路径相对于运行时工作目录（workspace 根）。
+
+[kafka]
+bootstrapServers = "127.0.0.1:9092"
+# topic 省略时用默认值：metric=enn_data_iot_metric event=data_iot_event info=data_iot_device_info
+
+# 本地设备清单（DeviceDirectory 一期实现，tcp 登录用）
+[[devices]]
+projectId = "p1"
+sn = "SN001"
+deviceId = "dev-001"
+password = "pw1"
+
+# tcp server 段：演示协议注册表构建（加载 Lua 脚本）
+[[tcp.server.configuration]]
+address = "0.0.0.0"
+port = 9000
+parserType = "LINE"
+heartbeatInterval = 120
+
+[tcp.server.configuration.protocol]
+name = "json_passthrough"
+path = "crates/connector-common/protocols/json_passthrough.lua"
+type = "script"
+
+[tcp.server.configuration.protocol.params]
+username = "u"
+password = "p"

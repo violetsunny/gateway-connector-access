@@ -1,0 +1,7 @@
+#!/bin/sh
+# 质量闸门：fmt 检查（秒级）。clippy/test 分钟级不进 hook，交 agent 验证流程。
+# 安装：cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+cargo fmt --all -- --check || {
+  echo "pre-commit: cargo fmt 检查未通过，先运行 cargo fmt --all"
+  exit 1
+}

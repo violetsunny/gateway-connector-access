@@ -1,0 +1,28 @@
+[package]
+name = "gateway"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "gateway"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+connector-common.workspace = true
+connector-http.workspace = true
+connector-modbus-tcp.workspace = true
+connector-mqtt.workspace = true
+connector-opcua.workspace = true
+connector-request.workspace = true
+connector-snmp.workspace = true
+connector-tcp.workspace = true
+connector-udp.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true

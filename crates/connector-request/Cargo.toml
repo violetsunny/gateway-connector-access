@@ -1,0 +1,21 @@
+[package]
+name = "connector-request"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono.workspace = true
+connector-common.workspace = true
+cron.workspace = true
+governor.workspace = true
+rdkafka.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+toml.workspace = true

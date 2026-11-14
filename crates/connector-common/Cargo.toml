@@ -1,0 +1,16 @@
+[package]
+name = "connector-common"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+mlua.workspace = true
+rdkafka.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
