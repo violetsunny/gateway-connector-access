@@ -24,6 +24,7 @@ cron = "0.17.0"
 flate2 = "1.1.10"
 governor = "0.10.4"
 mlua = { version = "0.12", features = ["lua54", "vendored", "serde", "send"] }
+mqtt-broker = { path = "crates/mqtt-broker", version = "0.1.0" }
 opcua = "0.12.0"
 rand = "0.10.2"
 rdkafka = "0.39"

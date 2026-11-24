@@ -1,0 +1,7 @@
+# mqtt-broker 示例配置：cargo run -p mqtt-broker -- crates/mqtt-broker/config.example.toml
+listen = "0.0.0.0:1883"
+
+# 可选鉴权：设置 username 后 CONNECT 必须携带匹配的用户名/密码，否则拒绝（CONNACK 0x04）。
+# 缺省（注释掉）允许匿名连接。
+# username = "admin"
+# password = "secret"

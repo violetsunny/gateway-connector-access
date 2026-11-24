@@ -8,6 +8,7 @@ Rust cargo workspace（edition 2024），由单包 demo 改造为 iot-gateway �
 - `crates/connector-common`：共享基建——核心 trait（Connector / DeviceSink / DeviceDirectory / Protocol）、消息模型、Lua 协议引擎（mlua）、TOML 配置模型、统一错误（thiserror）。
 - `crates/gateway`：主程序，读 TOML 配置 → 初始化 tracing → 构建协议注册表 → 构建 sink（Kafka，不可用降级 stdout）→ 装配 8 个 connector（失败隔离）→ Ctrl-C 逆序优雅停机。示例配置 `config.example.toml`（workspace 根，无外部服务可冒烟）。
 - `crates/connector-{tcp,udp,mqtt,modbus-tcp,http,snmp,request,opcua}`：各协议 connector（票 02-09 已完成）。
+- `crates/mqtt-broker`：独立 MQTT 3.1.1 broker（手写 codec 零新增依赖；QoS 0/1 + retained + will + 通配路由 + 持久会话；非 connector，不依赖 connector-common）。
 
 ## 常用命令
 
@@ -17,6 +18,7 @@ Rust cargo workspace（edition 2024），由单包 demo 改造为 iot-gateway �
 - Lint：`cargo clippy --workspace --all-targets -- -D warnings`
 - 测试：`cargo test --workspace`；单个：`cargo test -p <crate> <测试名>`
 - 运行 gateway：`cargo run -p gateway -- <config.toml>`（或设 `GATEWAY_CONFIG` 环境变量）
+- 运行 mqtt broker：`cargo run -p mqtt-broker -- crates/mqtt-broker/config.example.toml`（无参数 = 0.0.0.0:1883 匿名）
 - 运行 demo：`cargo run -p learn-demo`
 
 ## 依赖白名单（新增须在此登记）
